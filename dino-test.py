@@ -1,11 +1,17 @@
 import torch
 from torchvision import transforms
 from PIL import Image
-from time import time
 import os
+import csv
+from tqdm import tqdm
+from math import ceil
+
+IMAGE_DIR = "/home/xeing0de/gallery/memes"
+OUTPUT_CSV = "image_batches.csv"
+BATCH_SIZE = 16
 
 if not torch.cuda.is_available():
-    print("[INFO] CUDA не найден → отключаю xFormers (работа на CPU)")
+    print("[INFO] CUDA не найден → работаем на CPU, xFormers отключен")
     os.environ["DINO_DISABLE_XFORMERS"] = "1"
     os.environ["XFORMERS_DISABLED"] = "1"
 
@@ -14,8 +20,6 @@ dino_model.eval()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dino_model = dino_model.to(device)
-
-start = time()
 
 transform = transforms.Compose([
     transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
@@ -27,28 +31,35 @@ transform = transforms.Compose([
     ),
 ])
 
-img_path = "/home/xeing0de/gallery/memes/0.jpg"
-image = Image.open(img_path).convert("RGB")
+image_files = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+image_files.sort()
 
-if device == "cpu":
-    image_tensor = transform(image).unsqueeze(0)
-else:
-    image_tensor = transform(image).unsqueeze(0).to(device)
+total_images = len(image_files)
+total_batches = ceil(total_images / BATCH_SIZE)
 
+print(f"[INFO] Найдено {total_images} изображений, будет {total_batches} батчей")
 
-with torch.no_grad():
-    embedding = dino_model(image_tensor)
+with open(OUTPUT_CSV, "w", newline="") as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["filename", "batch_index"])
 
+    for batch_idx in tqdm(range(total_batches)):
+        batch_files = image_files[batch_idx * BATCH_SIZE : (batch_idx + 1) * BATCH_SIZE]
 
-if device == "cpu":
-    embedding = embedding[0].numpy()
-else:
-    embedding = embedding[0].cpu().numpy()
+        batch_tensors = []
+        for fname in batch_files:
+            img_path = os.path.join(IMAGE_DIR, fname)
+            image = Image.open(img_path).convert("RGB")
+            tensor = transform(image)
+            batch_tensors.append(tensor)
 
-end = time()
+        batch_tensor = torch.stack(batch_tensors).to(device)
 
-print("Размер эмбеддинга:", embedding.shape)
-print(embedding)
+        with torch.no_grad():
+            batch_embeddings = dino_model(batch_tensor)
 
-print(end - start)
+        batch_embeddings=batch_embeddings.cpu().numpy()
 
+        for fname, emb in zip(batch_files, batch_embeddings):
+            emb_str = ";".join(map(str, emb))
+            writer.writerow([fname, emb_str])
