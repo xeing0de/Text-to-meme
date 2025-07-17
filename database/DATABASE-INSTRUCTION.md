@@ -33,7 +33,7 @@ result = db.near_objects(v, limit=5)
 pprint(result)
 ```
 Пример вывода:
-```commandline
+```text
 [WDBObject(path='path1', is_text=None, distance=0.0),
  WDBObject(path='path1', is_text=None, distance=0.0),
  WDBObject(path='/test/path', is_text=False, distance=1.0),

@@ -29,12 +29,21 @@ transform = transforms.Compose([
 
 img_path = "/home/xeing0de/gallery/memes/0.jpg"
 image = Image.open(img_path).convert("RGB")
-image_tensor = transform(image).unsqueeze(0)
+
+if device == "cpu":
+    image_tensor = transform(image).unsqueeze(0)
+else:
+    image_tensor = transform(image).unsqueeze(0).to(device)
+
 
 with torch.no_grad():
     embedding = dino_model(image_tensor)
 
-embedding = embedding[0].numpy()
+
+if device == "cpu":
+    embedding = embedding[0].numpy()
+else:
+    embedding = embedding[0].cpu().numpy()
 
 end = time()
 
