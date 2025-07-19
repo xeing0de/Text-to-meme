@@ -1,14 +1,13 @@
 import torch
-from torchvision import transforms
-from PIL import Image
 import os
 import csv
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from math import ceil
 
-IMAGE_DIR = "/home/xeing0de/gallery/memes"
+TENSOR_DIR = "/home/xeing0de/Projects/Text-to-meme/img-to-ten/tensors"
 OUTPUT_CSV = "image_batches.csv"
-BATCH_SIZE = 16
+NUM_WORKERS = 4
+BATCH_SIZE = 64
 
 if not torch.cuda.is_available():
     print("[INFO] CUDA не найден → работаем на CPU, xFormers отключен")
@@ -21,45 +20,45 @@ dino_model.eval()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dino_model = dino_model.to(device)
 
-transform = transforms.Compose([
-    transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=(0.485, 0.456, 0.406),
-        std=(0.229, 0.224, 0.225),
-    ),
-])
+class TensorDataset(Dataset):
+    def __init__(self, tensor_dir):
+        self.tensor_dir = tensor_dir
+        self.files = [f for f in os.listdir(tensor_dir) if f.endswith(".pt")]
+        self.files.sort()
 
-image_files = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
-image_files.sort()
+    def __len__(self):
+        return len(self.files)
 
-total_images = len(image_files)
-total_batches = ceil(total_images / BATCH_SIZE)
+    def __getitem__(self, idx):
+        fname = self.files[idx]
+        fpath = os.path.join(self.tensor_dir, fname)
+        tensor = torch.load(fpath)
+        return fname, tensor
 
-print(f"[INFO] Найдено {total_images} изображений, будет {total_batches} батчей")
+dataset = TensorDataset(TENSOR_DIR)
+dataloader = DataLoader(
+    dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False,
+    num_workers=NUM_WORKERS,
+    pin_memory=True
+)
+
+print(f"[INFO] Найдено {len(dataset)} готовых тензоров")
 
 with open(OUTPUT_CSV, "w", newline="") as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(["filename", "batch_index"])
+    writer.writerow(["filename", "embedding"])
 
-    for batch_idx in tqdm(range(total_batches)):
-        batch_files = image_files[batch_idx * BATCH_SIZE : (batch_idx + 1) * BATCH_SIZE]
-
-        batch_tensors = []
-        for fname in batch_files:
-            img_path = os.path.join(IMAGE_DIR, fname)
-            image = Image.open(img_path).convert("RGB")
-            tensor = transform(image)
-            batch_tensors.append(tensor)
-
-        batch_tensor = torch.stack(batch_tensors).to(device)
+    for batch_filenames, batch_tensors in tqdm(dataloader, desc="Инференс"):
+        batch_tensors = batch_tensors.to(device)
 
         with torch.no_grad():
-            batch_embeddings = dino_model(batch_tensor)
+            batch_embeddings = dino_model(batch_tensors)
 
-        batch_embeddings=batch_embeddings.cpu().numpy()
+        batch_embeddings = batch_embeddings.cpu().numpy()
 
-        for fname, emb in zip(batch_files, batch_embeddings):
+        for fname, emb in zip(batch_filenames, batch_embeddings):
+            clean_name = os.path.splitext(fname)[0]
             emb_str = ";".join(map(str, emb))
-            writer.writerow([fname, emb_str])
+            writer.writerow([clean_name, emb_str])
