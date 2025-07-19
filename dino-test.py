@@ -59,6 +59,5 @@ with open(OUTPUT_CSV, "w", newline="") as csvfile:
         batch_embeddings = batch_embeddings.cpu().numpy()
 
         for fname, emb in zip(batch_filenames, batch_embeddings):
-            clean_name = os.path.splitext(fname)[0]
             emb_str = ";".join(map(str, emb))
-            writer.writerow([clean_name, emb_str])
+            writer.writerow([fname, emb_str])
