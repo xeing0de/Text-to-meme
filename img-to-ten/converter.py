@@ -4,7 +4,7 @@ from torchvision import transforms
 import torch
 from tqdm import tqdm
 
-SRC_DIR = "/home/xeing0de/gallery/memes"
+from config import SRC_DIR
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 new_folder = "tensors"

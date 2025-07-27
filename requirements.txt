@@ -8,3 +8,4 @@ tqdm==4.67.1
 torchvision==0.22.1
 xformers==0.0.31.post1
 git+https://github.com/openai/CLIP.git
+pandas==2.3.1

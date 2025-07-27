@@ -4,7 +4,8 @@ import csv
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-TENSOR_DIR = "/home/xeing0de/Projects/Text-to-meme/img-to-ten/tensors"
+from config import TENSOR_DIR
+
 OUTPUT_CSV = "image_batches.csv"
 NUM_WORKERS = 4
 BATCH_SIZE = 64
