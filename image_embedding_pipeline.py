@@ -11,13 +11,13 @@ from tqdm import tqdm
 from config import SRC_DIR
 from database import WDBObject
 
-MAX_QUEUE_TORCH_SIZE = 100
+COUNT_DINO_WORKERS = 6
+MAX_QUEUE_TORCH_SIZE = COUNT_DINO_WORKERS * 5
 IMAGE_FILES = image_files = tuple(f for f in os.listdir(SRC_DIR) if f.lower().endswith((".jpg", ".jpeg", ".png")))
 IMAGE_FILES_SIZE = len(IMAGE_FILES)
 OUTPUT_BIN = "image_batches.bin"
-COUNT_DINO_WORKERS = 4
 
-pbar = tqdm(total=IMAGE_FILES_SIZE)
+pbar = tqdm(total=IMAGE_FILES_SIZE, unit="img", smoothing=0, colour="green", desc="IMG to embedding")
 
 
 # Запись в файл
@@ -32,7 +32,6 @@ class Writer(Process):
     def writer(self, item: tuple[str, Tensor]):
         wdb_object = WDBObject.from_base(item)
         byte_obj = wdb_object.to_bytes()
-        print(byte_obj)
         self.bin_file.write(byte_obj)
 
     def run(self):
@@ -68,6 +67,8 @@ class DinoWorker(Process):
             tensor = tensor.to(self.device)
             embedding = self.dino_model(tensor.unsqueeze(0))
             embedding = embedding.squeeze(0).cpu()
+        del tensor
+        torch.cuda.empty_cache()
         return img_name, embedding
 
     def run(self):
