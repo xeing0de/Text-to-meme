@@ -4,7 +4,9 @@ import torch
 
 from config import SRC_DIR
 
-image_files = [f for f in os.listdir(SRC_DIR) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+image_files = sorted([f for f in os.listdir(SRC_DIR) 
+                      if f.lower().endswith((".jpg", ".jpeg", ".png"))],
+                     key=lambda x: int(os.path.splitext(x)[0]))
 
 reader = easyocr.Reader(['en', 'ru'], gpu=torch.cuda.is_available())
 
@@ -13,10 +15,13 @@ for fname in image_files[:10]:
     base_name = os.path.splitext(fname)[0]
 
     text = reader.readtext(src_path)
-
+    result = ""
     print("Изображение:", base_name)
+#    result = " ".join(x[1] for x in text)
     for res in text:
-        print("Результат:", res[1], "\nВероятность:", res[2])
-    print('\n\n')
+        if res[2] > 0.6:
+            result += res[1] + " "
+    if len(result) > 3:
+        print(result + "\n\n")
 
 
